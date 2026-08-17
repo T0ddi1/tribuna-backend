@@ -1,0 +1,291 @@
+using System.Security.Claims;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using NewsPortal.Api.Data;
+using NewsPortal.Api.DTOs;
+using NewsPortal.Api.Models;
+
+namespace NewsPortal.Api.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class ArtigosController : ControllerBase
+{
+    private const int TamanhoPaginaMaximo = 50;
+
+    private readonly ApplicationDbContext _context;
+
+    public ArtigosController(ApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    private static ArtigoListItemDto ParaListItemDto(Artigo a) => new()
+    {
+        Id = a.Id,
+        Slug = a.Slug,
+        Titulo = a.Titulo,
+        Resumo = a.Resumo,
+        ImagemCapaUrl = a.ImagemCapaUrl,
+        Patrocinado = a.Patrocinado,
+        Publicada = a.Publicada,
+        PublicadoEm = a.PublicadoEm,
+        CategoriaNome = a.Categoria?.Nome ?? string.Empty,
+        CategoriaSlug = a.Categoria?.Slug ?? string.Empty,
+        AutorNome = a.Autor?.NomeCompleto ?? string.Empty,
+    };
+
+    private static List<string> DesserializarParagrafos(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<PaginaResultDto<ArtigoListItemDto>>> Listar(
+        [FromQuery] string? categoria,
+        [FromQuery] string? busca,
+        [FromQuery] int pagina = 1,
+        [FromQuery] int tamanhoPagina = 10)
+    {
+        pagina = Math.Max(pagina, 1);
+        tamanhoPagina = Math.Clamp(tamanhoPagina, 1, TamanhoPaginaMaximo);
+
+        var query = _context.Artigos
+            .AsNoTracking()
+            .Include(a => a.Categoria)
+            .Include(a => a.Autor)
+            .Where(a => a.Publicada);
+
+        if (!string.IsNullOrWhiteSpace(categoria))
+        {
+            query = query.Where(a => a.Categoria!.Slug == categoria);
+        }
+
+        if (!string.IsNullOrWhiteSpace(busca))
+        {
+            // Termo limitado e sempre usado como parâmetro (EF Core parametriza a query),
+            // evitando SQL injection e prevenindo buscas custosas com input gigante.
+            var termo = busca.Trim();
+            if (termo.Length > 100)
+            {
+                termo = termo[..100];
+            }
+
+            query = query.Where(a => EF.Functions.Like(a.Titulo, $"%{termo}%") || EF.Functions.Like(a.Resumo, $"%{termo}%"));
+        }
+
+        var totalItens = await query.CountAsync();
+        var itens = await query
+            .OrderByDescending(a => a.PublicadoEm)
+            .Skip((pagina - 1) * tamanhoPagina)
+            .Take(tamanhoPagina)
+            .ToListAsync();
+
+        return Ok(new PaginaResultDto<ArtigoListItemDto>
+        {
+            Itens = itens.Select(ParaListItemDto),
+            PaginaAtual = pagina,
+            TotalPaginas = (int)Math.Ceiling(totalItens / (double)tamanhoPagina),
+            TotalItens = totalItens,
+        });
+    }
+
+    [HttpGet("destaque")]
+    public async Task<ActionResult<IEnumerable<ArtigoListItemDto>>> Destaques([FromQuery] int quantidade = 5)
+    {
+        quantidade = Math.Clamp(quantidade, 1, 20);
+
+        var artigos = await _context.Artigos
+            .AsNoTracking()
+            .Include(a => a.Categoria)
+            .Include(a => a.Autor)
+            .Where(a => a.Publicada && a.Destaque)
+            .OrderByDescending(a => a.PublicadoEm)
+            .Take(quantidade)
+            .ToListAsync();
+
+        return Ok(artigos.Select(ParaListItemDto));
+    }
+
+    [HttpGet("{slug}")]
+    public async Task<ActionResult<ArtigoDetailDto>> ObterPorSlug(string slug)
+    {
+        var artigo = await _context.Artigos
+            .Include(a => a.Categoria)
+            .Include(a => a.Autor)
+            .FirstOrDefaultAsync(a => a.Slug == slug && a.Publicada);
+
+        if (artigo is null)
+        {
+            return NotFound();
+        }
+
+        artigo.Visualizacoes++;
+        await _context.SaveChangesAsync();
+
+        var relacionados = await _context.Artigos
+            .AsNoTracking()
+            .Include(a => a.Categoria)
+            .Include(a => a.Autor)
+            .Where(a => a.Publicada && a.CategoriaId == artigo.CategoriaId && a.Id != artigo.Id)
+            .OrderByDescending(a => a.PublicadoEm)
+            .Take(4)
+            .ToListAsync();
+
+        var dto = new ArtigoDetailDto
+        {
+            Id = artigo.Id,
+            Slug = artigo.Slug,
+            Titulo = artigo.Titulo,
+            Subtitulo = artigo.Subtitulo,
+            Resumo = artigo.Resumo,
+            Paragrafos = DesserializarParagrafos(artigo.ConteudoJson),
+            ImagemCapaUrl = artigo.ImagemCapaUrl,
+            Patrocinado = artigo.Patrocinado,
+            Publicada = artigo.Publicada,
+            PublicadoEm = artigo.PublicadoEm,
+            Visualizacoes = artigo.Visualizacoes,
+            CategoriaNome = artigo.Categoria?.Nome ?? string.Empty,
+            CategoriaSlug = artigo.Categoria?.Slug ?? string.Empty,
+            AutorNome = artigo.Autor?.NomeCompleto ?? string.Empty,
+            RelacionadosMesmaCategoria = relacionados.Select(ParaListItemDto),
+        };
+
+        return Ok(dto);
+    }
+
+    private static string GerarSlug(string titulo)
+    {
+        var normalizado = titulo.Trim().ToLowerInvariant();
+        normalizado = Regex.Replace(normalizado, "[^a-z0-9\\s-]", "");
+        normalizado = Regex.Replace(normalizado, "\\s+", "-").Trim('-');
+        return normalizado;
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin,Editor")]
+    public async Task<ActionResult<ArtigoDetailDto>> Criar(ArtigoCreateDto dto)
+    {
+        var autorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+        var categoriaExiste = await _context.Categorias.AnyAsync(c => c.Id == dto.CategoriaId);
+        if (!categoriaExiste)
+        {
+            return BadRequest(new { mensagem = "Categoria informada não existe." });
+        }
+
+        var slugBase = GerarSlug(dto.Titulo);
+        if (string.IsNullOrWhiteSpace(slugBase))
+        {
+            return BadRequest(new { mensagem = "Não foi possível gerar um slug a partir do título." });
+        }
+
+        var slug = slugBase;
+        var sufixo = 1;
+        while (await _context.Artigos.AnyAsync(a => a.Slug == slug))
+        {
+            slug = $"{slugBase}-{++sufixo}";
+        }
+
+        var artigo = new Artigo
+        {
+            Slug = slug,
+            Titulo = dto.Titulo,
+            Subtitulo = dto.Subtitulo,
+            Resumo = dto.Resumo,
+            ConteudoJson = JsonSerializer.Serialize(dto.Paragrafos),
+            ImagemCapaUrl = dto.ImagemCapaUrl,
+            Patrocinado = dto.Patrocinado,
+            Destaque = dto.Destaque,
+            Publicada = dto.Publicada,
+            PublicadoEm = dto.Publicada ? DateTime.UtcNow : null,
+            CategoriaId = dto.CategoriaId,
+            AutorId = autorId,
+        };
+
+        _context.Artigos.Add(artigo);
+        await _context.SaveChangesAsync();
+
+        await _context.Entry(artigo).Reference(a => a.Categoria).LoadAsync();
+        await _context.Entry(artigo).Reference(a => a.Autor).LoadAsync();
+
+        return CreatedAtAction(nameof(ObterPorSlug), new { slug = artigo.Slug }, ParaListItemDto(artigo));
+    }
+
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin,Editor")]
+    public async Task<IActionResult> Atualizar(int id, ArtigoUpdateDto dto)
+    {
+        var artigo = await _context.Artigos.FirstOrDefaultAsync(a => a.Id == id);
+        if (artigo is null)
+        {
+            return NotFound();
+        }
+
+        var autorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var ehAdmin = User.IsInRole(Roles.Admin);
+        if (!ehAdmin && artigo.AutorId != autorId)
+        {
+            return Forbid();
+        }
+
+        var categoriaExiste = await _context.Categorias.AnyAsync(c => c.Id == dto.CategoriaId);
+        if (!categoriaExiste)
+        {
+            return BadRequest(new { mensagem = "Categoria informada não existe." });
+        }
+
+        var jaEstavaPublicada = artigo.Publicada;
+
+        artigo.Titulo = dto.Titulo;
+        artigo.Subtitulo = dto.Subtitulo;
+        artigo.Resumo = dto.Resumo;
+        artigo.ConteudoJson = JsonSerializer.Serialize(dto.Paragrafos);
+        artigo.ImagemCapaUrl = dto.ImagemCapaUrl;
+        artigo.Patrocinado = dto.Patrocinado;
+        artigo.Destaque = dto.Destaque;
+        artigo.Publicada = dto.Publicada;
+        artigo.AtualizadoEm = DateTime.UtcNow;
+        artigo.CategoriaId = dto.CategoriaId;
+
+        if (dto.Publicada && !jaEstavaPublicada)
+        {
+            artigo.PublicadoEm = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin,Editor")]
+    public async Task<IActionResult> Deletar(int id)
+    {
+        var artigo = await _context.Artigos.FirstOrDefaultAsync(a => a.Id == id);
+        if (artigo is null)
+        {
+            return NotFound();
+        }
+
+        var autorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var ehAdmin = User.IsInRole(Roles.Admin);
+        if (!ehAdmin && artigo.AutorId != autorId)
+        {
+            return Forbid();
+        }
+
+        _context.Artigos.Remove(artigo);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+}
