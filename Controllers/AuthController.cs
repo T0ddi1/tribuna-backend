@@ -116,6 +116,39 @@ public class AuthController : ControllerBase
         return Ok(resposta);
     }
 
+    // Autocadastro público, mas só cria contas de Leitor (favoritos/comentários/curtidas) —
+    // criação de contas de Admin/Editor continua exclusiva do endpoint POST usuarios.
+    [HttpPost("cadastro")]
+    [EnableRateLimiting("auth")]
+    public async Task<ActionResult<AuthResponseDto>> Cadastro(CadastroLeitorDto dto)
+    {
+        var existente = await _userManager.FindByEmailAsync(dto.Email);
+        if (existente is not null)
+        {
+            return Conflict(new { mensagem = "Já existe uma conta com este e-mail." });
+        }
+
+        var usuario = new ApplicationUser
+        {
+            UserName = dto.Email,
+            Email = dto.Email,
+            NomeCompleto = dto.NomeCompleto,
+            EmailConfirmed = true,
+        };
+
+        var resultado = await _userManager.CreateAsync(usuario, dto.Senha);
+        if (!resultado.Succeeded)
+        {
+            return BadRequest(resultado.Errors.Select(e => e.Description));
+        }
+
+        await _userManager.AddToRoleAsync(usuario, Models.Roles.Leitor);
+
+        var roles = await _userManager.GetRolesAsync(usuario);
+        var resposta = await EmitirTokensAsync(usuario, roles);
+        return Ok(resposta);
+    }
+
     // Sempre responde com a mesma mensagem genérica, exista ou não o e-mail —
     // evita enumeração de contas via este endpoint.
     [HttpPost("esqueci-senha")]

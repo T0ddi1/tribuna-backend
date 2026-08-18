@@ -4,17 +4,10 @@ namespace NewsPortal.Api.DTOs;
 
 public class ComentarioCreateDto
 {
-    [Required, MaxLength(120)]
-    public string Nome { get; set; } = string.Empty;
-
-    [Required, EmailAddress, MaxLength(256)]
-    public string Email { get; set; } = string.Empty;
-
+    // Nome/e-mail não vêm mais do formulário — comentar exige login, e a
+    // identidade é lida do usuário autenticado (ver ComentariosController.Criar).
     [Required, MaxLength(2000), MinLength(3)]
     public string Texto { get; set; } = string.Empty;
-
-    // Honeypot: campo invisível no formulário real; se vier preenchido, é bot.
-    public string? Website { get; set; }
 }
 
 public class ComentarioResponseDto
@@ -23,6 +16,8 @@ public class ComentarioResponseDto
     public string Nome { get; set; } = string.Empty;
     public string Texto { get; set; } = string.Empty;
     public DateTime CriadoEm { get; set; }
+    public int Curtidas { get; set; }
+    public bool CurtidoPeloUsuarioAtual { get; set; }
 }
 
 public class ComentarioModeracaoDto : ComentarioResponseDto

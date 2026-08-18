@@ -84,7 +84,7 @@ public static class SeedService
             logger.LogInformation("Verticais padrão criadas: {Verticais}", string.Join(", ", VerticaisPadrao.Select(v => v.Slug)));
         }
 
-        foreach (var role in Roles.Todas)
+        foreach (var role in Roles.TodasComLeitor)
         {
             if (!await roleManager.RoleExistsAsync(role))
             {

@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -15,13 +17,20 @@ namespace NewsPortal.Api.Controllers;
 public class ComentariosController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<ComentariosController> _logger;
     private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
 
-    public ComentariosController(ApplicationDbContext context, ILogger<ComentariosController> logger, IEmailService emailService, IConfiguration config)
+    public ComentariosController(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        ILogger<ComentariosController> logger,
+        IEmailService emailService,
+        IConfiguration config)
     {
         _context = context;
+        _userManager = userManager;
         _logger = logger;
         _emailService = emailService;
         _config = config;
@@ -31,49 +40,60 @@ public class ComentariosController : ControllerBase
     // então não há motivo legítimo para conter tags (mitiga stored XSS na origem).
     private static string RemoverHtml(string texto) => Regex.Replace(texto, "<.*?>", string.Empty).Trim();
 
-    private static ComentarioResponseDto ParaDto(Comentario c) => new()
-    {
-        Id = c.Id,
-        Nome = c.Nome,
-        Texto = c.Texto,
-        CriadoEm = c.CriadoEm,
-    };
-
     [HttpGet("artigos/{artigoId:int}/comentarios")]
     public async Task<ActionResult<IEnumerable<ComentarioResponseDto>>> ListarPorArtigo(int artigoId)
     {
+        // Autenticação é opcional aqui (endpoint público) — só usamos o id do
+        // usuário, se houver, pra marcar quais comentários ele já curtiu.
+        var usuarioAtualId = User.Identity?.IsAuthenticated == true
+            ? User.FindFirstValue(ClaimTypes.NameIdentifier)
+            : null;
+
         var comentarios = await _context.Comentarios
             .AsNoTracking()
             .Where(c => c.ArtigoId == artigoId && c.Aprovado)
             .OrderByDescending(c => c.CriadoEm)
+            .Select(c => new ComentarioResponseDto
+            {
+                Id = c.Id,
+                Nome = c.Nome,
+                Texto = c.Texto,
+                CriadoEm = c.CriadoEm,
+                Curtidas = _context.ComentarioLikes.Count(l => l.ComentarioId == c.Id),
+                CurtidoPeloUsuarioAtual = usuarioAtualId != null &&
+                    _context.ComentarioLikes.Any(l => l.ComentarioId == c.Id && l.UsuarioId == usuarioAtualId),
+            })
             .ToListAsync();
 
-        return Ok(comentarios.Select(ParaDto));
+        return Ok(comentarios);
     }
 
+    // Comentar exige login (conta de Leitor ou de equipe editorial) — nome e
+    // e-mail vêm da conta autenticada, não de campos de texto livre.
     [HttpPost("artigos/{artigoId:int}/comentarios")]
+    [Authorize]
     [EnableRateLimiting("escrita-publica")]
     public async Task<IActionResult> Criar(int artigoId, ComentarioCreateDto dto)
     {
-        // Honeypot: bots preenchem todos os campos do formulário, incluindo o
-        // campo invisível "website". Se veio preenchido, descartamos silenciosamente.
-        if (!string.IsNullOrWhiteSpace(dto.Website))
-        {
-            _logger.LogInformation("Comentário descartado por honeypot preenchido.");
-            return Accepted();
-        }
-
         var artigo = await _context.Artigos.FirstOrDefaultAsync(a => a.Id == artigoId && a.Publicada);
         if (artigo is null)
         {
             return NotFound(new { mensagem = "Artigo não encontrado." });
         }
 
+        var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var usuario = await _userManager.FindByIdAsync(usuarioId);
+        if (usuario is null || !usuario.Ativo)
+        {
+            return Unauthorized();
+        }
+
         var comentario = new Comentario
         {
             ArtigoId = artigoId,
-            Nome = RemoverHtml(dto.Nome),
-            Email = dto.Email.Trim(),
+            UsuarioId = usuario.Id,
+            Nome = usuario.NomeCompleto,
+            Email = usuario.Email ?? string.Empty,
             Texto = RemoverHtml(dto.Texto),
             IpOrigem = HttpContext.Connection.RemoteIpAddress?.ToString(),
             Aprovado = false,
@@ -85,6 +105,40 @@ public class ComentariosController : ControllerBase
         await NotificarEditorialAsync(comentario, artigo.Titulo);
 
         return Accepted(new { mensagem = "Comentário enviado para moderação." });
+    }
+
+    // Curtir/descurtir alterna no mesmo endpoint: 1 clique curte, o próximo desfaz.
+    [HttpPost("comentarios/{id:int}/curtir")]
+    [Authorize]
+    [EnableRateLimiting("escrita-publica")]
+    public async Task<IActionResult> Curtir(int id)
+    {
+        var comentarioExiste = await _context.Comentarios.AnyAsync(c => c.Id == id && c.Aprovado);
+        if (!comentarioExiste)
+        {
+            return NotFound();
+        }
+
+        var usuarioId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var existente = await _context.ComentarioLikes
+            .FirstOrDefaultAsync(l => l.ComentarioId == id && l.UsuarioId == usuarioId);
+
+        bool curtido;
+        if (existente is not null)
+        {
+            _context.ComentarioLikes.Remove(existente);
+            curtido = false;
+        }
+        else
+        {
+            _context.ComentarioLikes.Add(new ComentarioLike { ComentarioId = id, UsuarioId = usuarioId });
+            curtido = true;
+        }
+
+        await _context.SaveChangesAsync();
+
+        var total = await _context.ComentarioLikes.CountAsync(l => l.ComentarioId == id);
+        return Ok(new { curtido, totalCurtidas = total });
     }
 
     [HttpGet("comentarios/pendentes")]

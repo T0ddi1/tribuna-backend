@@ -35,6 +35,18 @@ public class CriarUsuarioDto
     public string Role { get; set; } = Models.Roles.Editor;
 }
 
+public class CadastroLeitorDto
+{
+    [Required, MaxLength(150)]
+    public string NomeCompleto { get; set; } = string.Empty;
+
+    [Required, EmailAddress, MaxLength(256)]
+    public string Email { get; set; } = string.Empty;
+
+    [Required, MinLength(10), MaxLength(200)]
+    public string Senha { get; set; } = string.Empty;
+}
+
 public class EsqueciSenhaDto
 {
     [Required, EmailAddress, MaxLength(256)]
