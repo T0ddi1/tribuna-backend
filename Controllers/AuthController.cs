@@ -92,7 +92,7 @@ public class AuthController : ControllerBase
 
         if (tokenExistente is null || tokenExistente.Usuario is null || !tokenExistente.Usuario.Ativo)
         {
-            Response.Cookies.Delete(RefreshCookieName, new CookieOptions { Path = "/api/auth" });
+            Response.Cookies.Delete(RefreshCookieName, MontarOpcoesCookieBase());
             return Unauthorized(new { mensagem = "Sessão inválida." });
         }
 
@@ -101,7 +101,7 @@ public class AuthController : ControllerBase
             // Token reaproveitado ou expirado: revoga toda a família por segurança
             // (indício de reuse attack — token pode ter sido roubado).
             await RevogarTodosTokensAsync(tokenExistente.UserId, "reuse-detectado");
-            Response.Cookies.Delete(RefreshCookieName, new CookieOptions { Path = "/api/auth" });
+            Response.Cookies.Delete(RefreshCookieName, MontarOpcoesCookieBase());
             return Unauthorized(new { mensagem = "Sessão inválida." });
         }
 
@@ -129,7 +129,7 @@ public class AuthController : ControllerBase
             }
         }
 
-        Response.Cookies.Delete(RefreshCookieName, new CookieOptions { Path = "/api/auth" });
+        Response.Cookies.Delete(RefreshCookieName, MontarOpcoesCookieBase());
         return NoContent();
     }
 
@@ -272,16 +272,9 @@ public class AuthController : ControllerBase
         _context.RefreshTokens.Add(novoToken);
         await _context.SaveChangesAsync();
 
-        Response.Cookies.Append(RefreshCookieName, refreshBruto, new CookieOptions
-        {
-            HttpOnly = true,
-            // Secure exige HTTPS — em dev local (http://localhost) isso impediria o navegador
-            // de enviar o cookie de volta, então relaxamos apenas fora de produção/staging.
-            Secure = !_environment.IsDevelopment(),
-            SameSite = SameSiteMode.Strict,
-            Expires = novoToken.ExpiraEm,
-            Path = "/api/auth",
-        });
+        var opcoesCookie = MontarOpcoesCookieBase();
+        opcoesCookie.Expires = novoToken.ExpiraEm;
+        Response.Cookies.Append(RefreshCookieName, refreshBruto, opcoesCookie);
 
         return new AuthResponseDto
         {
@@ -292,6 +285,19 @@ public class AuthController : ControllerBase
             Roles = roles,
         };
     }
+
+    private CookieOptions MontarOpcoesCookieBase() => new()
+    {
+        HttpOnly = true,
+        // Secure exige HTTPS — em dev local (http://localhost) isso impediria o navegador
+        // de enviar o cookie de volta, então relaxamos apenas fora de produção/staging.
+        Secure = !_environment.IsDevelopment(),
+        // Frontend (otribuna.com.br) e backend (railway.app) são domínios diferentes,
+        // então o cookie é cross-site: SameSite=Strict/Lax nunca seria enviado em
+        // chamadas via fetch/XHR. None exige Secure=true, por isso só em produção.
+        SameSite = _environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
+        Path = "/api/auth",
+    };
 
     private async Task RevogarTodosTokensAsync(string userId, string motivo)
     {
