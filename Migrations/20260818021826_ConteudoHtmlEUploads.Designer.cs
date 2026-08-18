@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NewsPortal.Api.Data;
 
@@ -10,9 +11,11 @@ using NewsPortal.Api.Data;
 namespace NewsPortal.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260818021826_ConteudoHtmlEUploads")]
+    partial class ConteudoHtmlEUploads
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
@@ -225,14 +228,11 @@ namespace NewsPortal.Api.Migrations
                     b.Property<DateTime?>("AtualizadoEm")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("AutorExibicao")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("AutorId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("CategoriaId")
+                    b.Property<int>("CategoriaId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ConteudoHtml")
@@ -272,9 +272,6 @@ namespace NewsPortal.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("VerticalId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("Visualizacoes")
                         .HasColumnType("INTEGER");
 
@@ -287,8 +284,6 @@ namespace NewsPortal.Api.Migrations
                     b.HasIndex("Slug")
                         .IsUnique();
 
-                    b.HasIndex("VerticalId");
-
                     b.ToTable("Artigos");
                 });
 
@@ -298,13 +293,37 @@ namespace NewsPortal.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CorAccent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CorAccentDark")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CorAccentTint")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Descricao")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Icone")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Ordem")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("Tagline")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TemaEscuro")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -414,52 +433,6 @@ namespace NewsPortal.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
-            modelBuilder.Entity("NewsPortal.Api.Models.Vertical", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("CorAccent")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CorAccentDark")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CorAccentTint")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Descricao")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Icone")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Nome")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Ordem")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Tagline")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("TemaEscuro")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("Verticais");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -522,19 +495,12 @@ namespace NewsPortal.Api.Migrations
                     b.HasOne("NewsPortal.Api.Models.Categoria", "Categoria")
                         .WithMany("Artigos")
                         .HasForeignKey("CategoriaId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("NewsPortal.Api.Models.Vertical", "Vertical")
-                        .WithMany("Artigos")
-                        .HasForeignKey("VerticalId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Autor");
 
                     b.Navigation("Categoria");
-
-                    b.Navigation("Vertical");
                 });
 
             modelBuilder.Entity("NewsPortal.Api.Models.Comentario", b =>
@@ -565,11 +531,6 @@ namespace NewsPortal.Api.Migrations
                 });
 
             modelBuilder.Entity("NewsPortal.Api.Models.Categoria", b =>
-                {
-                    b.Navigation("Artigos");
-                });
-
-            modelBuilder.Entity("NewsPortal.Api.Models.Vertical", b =>
                 {
                     b.Navigation("Artigos");
                 });

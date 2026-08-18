@@ -66,6 +66,10 @@ App_Data/*.db-shm
 App_Data/*.db-wal
 !App_Data/.gitkeep
 
+# Imagens enviadas pelo painel admin — conteúdo de runtime, não de código.
+wwwroot/uploads/*
+!wwwroot/uploads/.gitkeep
+
 # Segredos nunca vão para o repositório (chave JWT, credenciais do Admin).
 # Em dev use `dotnet user-secrets`; em produção, variáveis de ambiente.
 appsettings.Local.json

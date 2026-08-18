@@ -1,21 +1,12 @@
 namespace NewsPortal.Api.Models;
 
+// Tema/assunto livre (tag) usado pra filtrar artigos dentro do blog —
+// independente de vertical, um artigo pode ter no máximo uma (opcional).
 public class Categoria
 {
     public int Id { get; set; }
     public string Nome { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
-    public string? Tagline { get; set; }
-    public string? Descricao { get; set; }
-    public string? Icone { get; set; }
-
-    // Tema visual usado nas páginas de vertical (capital, esportes, tech, gg...)
-    public string? CorAccent { get; set; }
-    public string? CorAccentDark { get; set; }
-    public string? CorAccentTint { get; set; }
-    public bool TemaEscuro { get; set; } = false;
-
-    public int Ordem { get; set; } = 0;
 
     public ICollection<Artigo> Artigos { get; set; } = new List<Artigo>();
 }

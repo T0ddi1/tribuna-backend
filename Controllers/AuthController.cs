@@ -198,6 +198,58 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpGet("usuarios")]
+    [Authorize(Roles = Models.Roles.Admin)]
+    public async Task<ActionResult<IEnumerable<UsuarioResponseDto>>> ListarUsuarios()
+    {
+        var usuarios = await _userManager.Users.OrderBy(u => u.NomeCompleto).ToListAsync();
+
+        var resultado = new List<UsuarioResponseDto>();
+        foreach (var usuario in usuarios)
+        {
+            var roles = await _userManager.GetRolesAsync(usuario);
+            resultado.Add(new UsuarioResponseDto
+            {
+                Id = usuario.Id,
+                NomeCompleto = usuario.NomeCompleto,
+                Email = usuario.Email!,
+                Ativo = usuario.Ativo,
+                Roles = roles,
+            });
+        }
+
+        return Ok(resultado);
+    }
+
+    // Desativar em vez de excluir: preserva a autoria dos artigos já publicados
+    // e revoga todas as sessões ativas da conta imediatamente.
+    [HttpPost("usuarios/{id}/status")]
+    [Authorize(Roles = Models.Roles.Admin)]
+    public async Task<IActionResult> AlterarStatusUsuario(string id, [FromBody] bool ativo)
+    {
+        var idAtual = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (id == idAtual && !ativo)
+        {
+            return BadRequest(new { mensagem = "Você não pode desativar a própria conta." });
+        }
+
+        var usuario = await _userManager.FindByIdAsync(id);
+        if (usuario is null)
+        {
+            return NotFound();
+        }
+
+        usuario.Ativo = ativo;
+        await _userManager.UpdateAsync(usuario);
+
+        if (!ativo)
+        {
+            await RevogarTodosTokensAsync(usuario.Id, "conta-desativada");
+        }
+
+        return NoContent();
+    }
+
     private async Task<AuthResponseDto> EmitirTokensAsync(ApplicationUser usuario, IList<string> roles, RefreshToken? tokenAnterior = null)
     {
         var (accessToken, expiraEm) = _tokenService.GerarAccessToken(usuario, roles);

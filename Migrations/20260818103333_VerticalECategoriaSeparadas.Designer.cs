@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NewsPortal.Api.Data;
 
@@ -10,9 +11,11 @@ using NewsPortal.Api.Data;
 namespace NewsPortal.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260818103333_VerticalECategoriaSeparadas")]
+    partial class VerticalECategoriaSeparadas
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
@@ -223,9 +226,6 @@ namespace NewsPortal.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AtualizadoEm")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AutorExibicao")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("AutorId")

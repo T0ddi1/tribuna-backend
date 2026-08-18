@@ -9,27 +9,6 @@ public class CategoriaCreateDto
 
     [Required, MaxLength(80), RegularExpression("^[a-z0-9-]+$", ErrorMessage = "Slug deve conter apenas letras minúsculas, números e hífens.")]
     public string Slug { get; set; } = string.Empty;
-
-    [MaxLength(200)]
-    public string? Tagline { get; set; }
-
-    [MaxLength(1000)]
-    public string? Descricao { get; set; }
-
-    [MaxLength(50)]
-    public string? Icone { get; set; }
-
-    [MaxLength(20)]
-    public string? CorAccent { get; set; }
-
-    [MaxLength(20)]
-    public string? CorAccentDark { get; set; }
-
-    [MaxLength(20)]
-    public string? CorAccentTint { get; set; }
-
-    public bool TemaEscuro { get; set; } = false;
-    public int Ordem { get; set; } = 0;
 }
 
 public class CategoriaResponseDto
@@ -37,13 +16,5 @@ public class CategoriaResponseDto
     public int Id { get; set; }
     public string Nome { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
-    public string? Tagline { get; set; }
-    public string? Descricao { get; set; }
-    public string? Icone { get; set; }
-    public string? CorAccent { get; set; }
-    public string? CorAccentDark { get; set; }
-    public string? CorAccentTint { get; set; }
-    public bool TemaEscuro { get; set; }
-    public int Ordem { get; set; }
     public int QuantidadeArtigos { get; set; }
 }

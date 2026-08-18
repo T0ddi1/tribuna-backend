@@ -7,6 +7,8 @@ using NewsPortal.Api.Models;
 
 namespace NewsPortal.Api.Controllers;
 
+// Temas/tags livres usados só pra filtrar dentro do blog — não definem em qual
+// vertical (Capital, Esportes...) o artigo aparece, isso é o VerticaisController.
 [ApiController]
 [Route("api/[controller]")]
 public class CategoriasController : ControllerBase
@@ -23,14 +25,6 @@ public class CategoriasController : ControllerBase
         Id = c.Id,
         Nome = c.Nome,
         Slug = c.Slug,
-        Tagline = c.Tagline,
-        Descricao = c.Descricao,
-        Icone = c.Icone,
-        CorAccent = c.CorAccent,
-        CorAccentDark = c.CorAccentDark,
-        CorAccentTint = c.CorAccentTint,
-        TemaEscuro = c.TemaEscuro,
-        Ordem = c.Ordem,
         QuantidadeArtigos = c.Artigos.Count(a => a.Publicada),
     };
 
@@ -40,7 +34,7 @@ public class CategoriasController : ControllerBase
         var categorias = await _context.Categorias
             .AsNoTracking()
             .Include(c => c.Artigos)
-            .OrderBy(c => c.Ordem)
+            .OrderBy(c => c.Nome)
             .ToListAsync();
 
         return Ok(categorias.Select(ParaDto));
@@ -63,7 +57,7 @@ public class CategoriasController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = "Admin,Editor")]
     public async Task<ActionResult<CategoriaResponseDto>> Criar(CategoriaCreateDto dto)
     {
         var slugEmUso = await _context.Categorias.AnyAsync(c => c.Slug == dto.Slug);
@@ -72,19 +66,7 @@ public class CategoriasController : ControllerBase
             return Conflict(new { mensagem = "Já existe uma categoria com este slug." });
         }
 
-        var categoria = new Categoria
-        {
-            Nome = dto.Nome,
-            Slug = dto.Slug,
-            Tagline = dto.Tagline,
-            Descricao = dto.Descricao,
-            Icone = dto.Icone,
-            CorAccent = dto.CorAccent,
-            CorAccentDark = dto.CorAccentDark,
-            CorAccentTint = dto.CorAccentTint,
-            TemaEscuro = dto.TemaEscuro,
-            Ordem = dto.Ordem,
-        };
+        var categoria = new Categoria { Nome = dto.Nome, Slug = dto.Slug };
 
         _context.Categorias.Add(categoria);
         await _context.SaveChangesAsync();
@@ -93,7 +75,7 @@ public class CategoriasController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = "Admin,Editor")]
     public async Task<IActionResult> Atualizar(int id, CategoriaCreateDto dto)
     {
         var categoria = await _context.Categorias.FirstOrDefaultAsync(c => c.Id == id);
@@ -110,21 +92,13 @@ public class CategoriasController : ControllerBase
 
         categoria.Nome = dto.Nome;
         categoria.Slug = dto.Slug;
-        categoria.Tagline = dto.Tagline;
-        categoria.Descricao = dto.Descricao;
-        categoria.Icone = dto.Icone;
-        categoria.CorAccent = dto.CorAccent;
-        categoria.CorAccentDark = dto.CorAccentDark;
-        categoria.CorAccentTint = dto.CorAccentTint;
-        categoria.TemaEscuro = dto.TemaEscuro;
-        categoria.Ordem = dto.Ordem;
 
         await _context.SaveChangesAsync();
         return NoContent();
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = "Admin,Editor")]
     public async Task<IActionResult> Deletar(int id)
     {
         var categoria = await _context.Categorias.Include(c => c.Artigos).FirstOrDefaultAsync(c => c.Id == id);

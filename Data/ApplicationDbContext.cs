@@ -11,6 +11,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     }
 
     public DbSet<Artigo> Artigos => Set<Artigo>();
+    public DbSet<Vertical> Verticais => Set<Vertical>();
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Comentario> Comentarios => Set<Comentario>();
     public DbSet<NewsletterAssinante> NewsletterAssinantes => Set<NewsletterAssinante>();
@@ -19,6 +20,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<Vertical>()
+            .HasIndex(v => v.Slug)
+            .IsUnique();
 
         builder.Entity<Categoria>()
             .HasIndex(c => c.Slug)
@@ -29,10 +34,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .IsUnique();
 
         builder.Entity<Artigo>()
+            .HasOne(a => a.Vertical)
+            .WithMany(v => v.Artigos)
+            .HasForeignKey(a => a.VerticalId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Artigo>()
             .HasOne(a => a.Categoria)
             .WithMany(c => c.Artigos)
             .HasForeignKey(a => a.CategoriaId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Entity<Artigo>()
             .HasOne(a => a.Autor)
