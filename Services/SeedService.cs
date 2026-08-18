@@ -9,12 +9,13 @@ public static class SeedService
 {
     // Editorias fixas do site (correspondem às rotas /capital, /esportes, /tech, /gg
     // no frontend) — criadas de fábrica pra já existir algo pra selecionar no admin.
-    private static readonly (string Nome, string Slug, string Tagline, string CorAccent)[] VerticaisPadrao =
+    private static readonly (string Nome, string Slug, string Tagline, string CorAccent, bool TemaEscuro)[] VerticaisPadrao =
     [
-        ("Capital", "capital", "Economia, mercado e negócios", "#d97706"),
-        ("Esportes", "esportes", "O que move o esporte", "#16a34a"),
-        ("Tech", "tech", "Tecnologia e inovação", "#2563eb"),
-        ("Games", "gg", "Games e cultura gamer", "#9333ea"),
+        ("Capital", "capital", "Economia, mercado e negócios", "#d97706", false),
+        ("Esportes", "esportes", "O que move o esporte", "#16a34a", false),
+        ("Tech", "tech", "Tecnologia e inovação", "#2563eb", false),
+        // Design pensado pra essa vertical usa fundo escuro — ver item de backlog "Tema escuro da vertical Games".
+        ("Games", "gg", "Games e cultura gamer", "#9333ea", true),
     ];
 
     // Artigos de exemplo — só pra time novo já ver conteúdo real ao rodar pela
@@ -66,7 +67,7 @@ public static class SeedService
         if (!await context.Verticais.AnyAsync())
         {
             var ordem = 0;
-            foreach (var (nome, slug, tagline, cor) in VerticaisPadrao)
+            foreach (var (nome, slug, tagline, cor, temaEscuro) in VerticaisPadrao)
             {
                 context.Verticais.Add(new Vertical
                 {
@@ -74,6 +75,7 @@ public static class SeedService
                     Slug = slug,
                     Tagline = tagline,
                     CorAccent = cor,
+                    TemaEscuro = temaEscuro,
                     Ordem = ordem++,
                 });
             }
