@@ -24,6 +24,7 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _config;
     private readonly ILogger<AuthController> _logger;
     private readonly IHostEnvironment _environment;
+    private readonly IEmailService _emailService;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -32,7 +33,8 @@ public class AuthController : ControllerBase
         ApplicationDbContext context,
         IConfiguration config,
         ILogger<AuthController> logger,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        IEmailService emailService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -41,6 +43,7 @@ public class AuthController : ControllerBase
         _config = config;
         _logger = logger;
         _environment = environment;
+        _emailService = emailService;
     }
 
     [HttpPost("login")]
@@ -111,6 +114,56 @@ public class AuthController : ControllerBase
         var roles = await _userManager.GetRolesAsync(tokenExistente.Usuario);
         var resposta = await EmitirTokensAsync(tokenExistente.Usuario, roles, tokenExistente);
         return Ok(resposta);
+    }
+
+    // Sempre responde com a mesma mensagem genérica, exista ou não o e-mail —
+    // evita enumeração de contas via este endpoint.
+    [HttpPost("esqueci-senha")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> EsqueciSenha(EsqueciSenhaDto dto)
+    {
+        var mensagem = new { mensagem = "Se o e-mail informado existir em nossa base, enviaremos instruções de redefinição." };
+
+        var usuario = await _userManager.FindByEmailAsync(dto.Email);
+        if (usuario is not null && usuario.Ativo)
+        {
+            var token = await _userManager.GeneratePasswordResetTokenAsync(usuario);
+            var frontendBaseUrl = (_config["Frontend:BaseUrl"] ?? "http://localhost:4200").TrimEnd('/');
+            var link = $"{frontendBaseUrl}/redefinir-senha" +
+                $"?email={Uri.EscapeDataString(usuario.Email!)}&token={Uri.EscapeDataString(token)}";
+
+            await _emailService.EnviarAsync(
+                usuario.Email!,
+                "Redefinição de senha — Tribuna",
+                $"<p>Olá, {usuario.NomeCompleto}.</p>" +
+                $"<p>Recebemos uma solicitação para redefinir sua senha. Clique no link abaixo para continuar:</p>" +
+                $"<p><a href=\"{link}\">Redefinir minha senha</a></p>" +
+                "<p>Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>");
+        }
+
+        return Ok(mensagem);
+    }
+
+    [HttpPost("redefinir-senha")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> RedefinirSenha(RedefinirSenhaDto dto)
+    {
+        var usuario = await _userManager.FindByEmailAsync(dto.Email);
+        if (usuario is null)
+        {
+            return BadRequest(new { mensagem = "Não foi possível redefinir a senha." });
+        }
+
+        var resultado = await _userManager.ResetPasswordAsync(usuario, dto.Token, dto.NovaSenha);
+        if (!resultado.Succeeded)
+        {
+            return BadRequest(resultado.Errors.Select(e => e.Description));
+        }
+
+        // Uma senha nova invalida qualquer sessão obtida com a senha antiga.
+        await RevogarTodosTokensAsync(usuario.Id, "senha-redefinida");
+
+        return NoContent();
     }
 
     [HttpPost("logout")]

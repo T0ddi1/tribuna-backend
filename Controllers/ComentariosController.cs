@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NewsPortal.Api.Data;
 using NewsPortal.Api.DTOs;
 using NewsPortal.Api.Models;
+using NewsPortal.Api.Services;
 
 namespace NewsPortal.Api.Controllers;
 
@@ -15,11 +16,15 @@ public class ComentariosController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ComentariosController> _logger;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _config;
 
-    public ComentariosController(ApplicationDbContext context, ILogger<ComentariosController> logger)
+    public ComentariosController(ApplicationDbContext context, ILogger<ComentariosController> logger, IEmailService emailService, IConfiguration config)
     {
         _context = context;
         _logger = logger;
+        _emailService = emailService;
+        _config = config;
     }
 
     // Remove qualquer marcação HTML do texto enviado — comentários são texto puro,
@@ -58,8 +63,8 @@ public class ComentariosController : ControllerBase
             return Accepted();
         }
 
-        var artigoExiste = await _context.Artigos.AnyAsync(a => a.Id == artigoId && a.Publicada);
-        if (!artigoExiste)
+        var artigo = await _context.Artigos.FirstOrDefaultAsync(a => a.Id == artigoId && a.Publicada);
+        if (artigo is null)
         {
             return NotFound(new { mensagem = "Artigo não encontrado." });
         }
@@ -76,6 +81,8 @@ public class ComentariosController : ControllerBase
 
         _context.Comentarios.Add(comentario);
         await _context.SaveChangesAsync();
+
+        await NotificarEditorialAsync(comentario, artigo.Titulo);
 
         return Accepted(new { mensagem = "Comentário enviado para moderação." });
     }
@@ -132,5 +139,29 @@ public class ComentariosController : ControllerBase
         _context.Comentarios.Remove(comentario);
         await _context.SaveChangesAsync();
         return NoContent();
+    }
+
+    // Best-effort: falha no envio de e-mail não deve derrubar a requisição do comentarista.
+    private async Task NotificarEditorialAsync(Comentario comentario, string artigoTitulo)
+    {
+        var emailEditorial = _config["Notificacoes:EmailEditorial"];
+        if (string.IsNullOrWhiteSpace(emailEditorial))
+        {
+            return;
+        }
+
+        try
+        {
+            await _emailService.EnviarAsync(
+                emailEditorial,
+                $"Novo comentário aguardando moderação — {artigoTitulo}",
+                $"<p><strong>{comentario.Nome}</strong> ({comentario.Email}) comentou em \"{artigoTitulo}\":</p>" +
+                $"<blockquote>{comentario.Texto}</blockquote>" +
+                "<p>Acesse o painel admin para aprovar ou remover.</p>");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Falha ao notificar equipe editorial sobre novo comentário {Id}.", comentario.Id);
+        }
     }
 }

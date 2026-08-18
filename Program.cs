@@ -43,6 +43,7 @@ builder.Services
 
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddSingleton<ConteudoSanitizerService>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSettings["Key"];

@@ -35,6 +35,24 @@ public class CriarUsuarioDto
     public string Role { get; set; } = Models.Roles.Editor;
 }
 
+public class EsqueciSenhaDto
+{
+    [Required, EmailAddress, MaxLength(256)]
+    public string Email { get; set; } = string.Empty;
+}
+
+public class RedefinirSenhaDto
+{
+    [Required, EmailAddress, MaxLength(256)]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public string Token { get; set; } = string.Empty;
+
+    [Required, MinLength(10), MaxLength(200)]
+    public string NovaSenha { get; set; } = string.Empty;
+}
+
 public class UsuarioResponseDto
 {
     public string Id { get; set; } = string.Empty;
