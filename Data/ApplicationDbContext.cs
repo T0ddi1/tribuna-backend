@@ -14,6 +14,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Vertical> Verticais => Set<Vertical>();
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Comentario> Comentarios => Set<Comentario>();
+    public DbSet<ComentarioLike> ComentarioLikes => Set<ComentarioLike>();
+    public DbSet<Favorito> Favoritos => Set<Favorito>();
     public DbSet<NewsletterAssinante> NewsletterAssinantes => Set<NewsletterAssinante>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
@@ -55,6 +57,44 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasOne(c => c.Artigo)
             .WithMany(a => a.Comentarios)
             .HasForeignKey(c => c.ArtigoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Comentario>()
+            .HasOne(c => c.Usuario)
+            .WithMany()
+            .HasForeignKey(c => c.UsuarioId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<ComentarioLike>()
+            .HasIndex(l => new { l.ComentarioId, l.UsuarioId })
+            .IsUnique();
+
+        builder.Entity<ComentarioLike>()
+            .HasOne(l => l.Comentario)
+            .WithMany()
+            .HasForeignKey(l => l.ComentarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<ComentarioLike>()
+            .HasOne(l => l.Usuario)
+            .WithMany()
+            .HasForeignKey(l => l.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Favorito>()
+            .HasIndex(f => new { f.UsuarioId, f.ArtigoId })
+            .IsUnique();
+
+        builder.Entity<Favorito>()
+            .HasOne(f => f.Usuario)
+            .WithMany()
+            .HasForeignKey(f => f.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Favorito>()
+            .HasOne(f => f.Artigo)
+            .WithMany()
+            .HasForeignKey(f => f.ArtigoId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<NewsletterAssinante>()

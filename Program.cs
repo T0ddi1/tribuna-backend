@@ -39,6 +39,7 @@ builder.Services
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddErrorDescriber<IdentityErrorDescriberPtBr>()
     .AddSignInManager();
 
 builder.Services.AddScoped<TokenService>();

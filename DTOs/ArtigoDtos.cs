@@ -4,20 +4,20 @@ namespace NewsPortal.Api.DTOs;
 
 public class ArtigoCreateDto
 {
-    [Required, MaxLength(200)]
+    [Required(ErrorMessage = "O campo {0} é obrigatório."), MaxLength(200, ErrorMessage = "O campo {0} deve ter no máximo {1} caracteres.")]
     public string Titulo { get; set; } = string.Empty;
 
-    [MaxLength(200)]
+    [MaxLength(200, ErrorMessage = "O campo {0} deve ter no máximo {1} caracteres.")]
     public string? Subtitulo { get; set; }
 
-    [Required, MaxLength(500)]
+    [Required(ErrorMessage = "O campo {0} é obrigatório."), MaxLength(500, ErrorMessage = "O campo {0} deve ter no máximo {1} caracteres.")]
     public string Resumo { get; set; } = string.Empty;
 
     // HTML produzido pelo editor Quill. Sanitizado no servidor antes de salvar.
-    [Required, MinLength(1), MaxLength(200_000)]
+    [Required(ErrorMessage = "O campo {0} é obrigatório."), MinLength(1, ErrorMessage = "O campo {0} deve ter pelo menos {1} caracteres."), MaxLength(200_000, ErrorMessage = "O campo {0} deve ter no máximo {1} caracteres.")]
     public string ConteudoHtml { get; set; } = string.Empty;
 
-    [MaxLength(500)]
+    [MaxLength(500, ErrorMessage = "O campo {0} deve ter no máximo {1} caracteres.")]
     public string? ImagemCapaUrl { get; set; }
 
     public bool Patrocinado { get; set; } = false;
@@ -25,7 +25,7 @@ public class ArtigoCreateDto
     public bool Publicada { get; set; } = false;
 
     // Seção do site onde o artigo aparece (Capital, Esportes, Tech, Games...).
-    [Required]
+    [Required(ErrorMessage = "O campo {0} é obrigatório.")]
     public int VerticalId { get; set; }
 
     // Tema/tag opcional, livre entre verticais — usado só pra filtrar no blog.
@@ -33,7 +33,7 @@ public class ArtigoCreateDto
 
     // Nome exibido como autor. Vazio = usa o nome de quem está publicando
     // (útil quando o Admin sobe um texto de terceiros).
-    [MaxLength(150)]
+    [MaxLength(150, ErrorMessage = "O campo {0} deve ter no máximo {1} caracteres.")]
     public string? AutorExibicao { get; set; }
 }
 

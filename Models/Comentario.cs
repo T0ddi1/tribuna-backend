@@ -10,6 +10,11 @@ public class Comentario
     public string Email { get; set; } = string.Empty;
     public string Texto { get; set; } = string.Empty;
 
+    // Nullable pra não quebrar comentários antigos, feitos antes de comentar exigir
+    // login (Nome/Email continuam preenchidos nesses casos, só sem conta vinculada).
+    public string? UsuarioId { get; set; }
+    public ApplicationUser? Usuario { get; set; }
+
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 
     // Comentários entram como pendentes e só aparecem publicamente após moderação
