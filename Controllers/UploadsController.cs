@@ -10,7 +10,7 @@ namespace NewsPortal.Api.Controllers;
 [Authorize(Roles = "Admin,Editor")]
 public class UploadsController : ControllerBase
 {
-    private const long TamanhoMaximoBytes = 5 * 1024 * 1024; // 5 MB
+    private const long TamanhoMaximoBytes = 10 * 1024 * 1024; // 10 MB
 
     // Assinatura binária (magic bytes) real do arquivo — nunca confiar só na
     // extensão ou no Content-Type declarado pelo cliente, que podem ser forjados.
@@ -44,7 +44,7 @@ public class UploadsController : ControllerBase
 
         if (arquivo.Length > TamanhoMaximoBytes)
         {
-            return BadRequest(new { mensagem = "Arquivo excede o tamanho máximo de 5 MB." });
+            return BadRequest(new { mensagem = "Arquivo excede o tamanho máximo de 10 MB." });
         }
 
         var extensao = Path.GetExtension(arquivo.FileName).ToLowerInvariant();
