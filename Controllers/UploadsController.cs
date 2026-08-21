@@ -76,7 +76,9 @@ public class UploadsController : ControllerBase
         // Nome sempre gerado pelo servidor — nunca usar o nome original do
         // cliente (evita path traversal e colisão/sobrescrita de arquivos).
         var nomeArquivo = $"{Guid.NewGuid():N}{extensao}";
-        var pastaUploads = Path.Combine(_environment.ContentRootPath, "wwwroot", "uploads");
+        // Dentro de App_Data (não wwwroot) — é o diretório com volume persistente
+        // no Railway, então os uploads sobrevivem a redeploys do backend.
+        var pastaUploads = Path.Combine(_environment.ContentRootPath, "App_Data", "uploads");
         Directory.CreateDirectory(pastaUploads);
         var caminhoCompleto = Path.Combine(pastaUploads, nomeArquivo);
 

@@ -184,8 +184,17 @@ app.Use(async (context, next) =>
 
 app.UseCors();
 
-// Serve só o conteúdo estático de wwwroot (imagens enviadas via /api/uploads/imagem).
-app.UseStaticFiles();
+// Serve as imagens enviadas via /api/uploads/imagem a partir de App_Data/uploads
+// — mesmo diretório do banco SQLite, dentro do volume persistente do Railway.
+// Servir de wwwroot faria os uploads sumirem a cada redeploy, já que só
+// App_Data tem um volume montado (ver Railway: mount path /app/App_Data).
+var pastaUploads = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "uploads");
+Directory.CreateDirectory(pastaUploads);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(pastaUploads),
+    RequestPath = "/uploads",
+});
 
 app.UseRateLimiter();
 
