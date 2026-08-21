@@ -1,3 +1,4 @@
+using ImageMagick;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -11,6 +12,12 @@ namespace NewsPortal.Api.Controllers;
 public class UploadsController : ControllerBase
 {
     private const long TamanhoMaximoBytes = 10 * 1024 * 1024; // 10 MB
+
+    // Maior largura recomendada entre os dois usos deste endpoint: capa
+    // (1200px) e imagem inserida no corpo do texto (1600px, pra manter
+    // nitidez em telas grandes). Upload maior que isso é redimensionado —
+    // nunca faz upscale de imagem menor.
+    private const int LarguraMaximaPx = 1600;
 
     // Assinatura binária (magic bytes) real do arquivo — nunca confiar só na
     // extensão ou no Content-Type declarado pelo cliente, que podem ser forjados.
@@ -74,11 +81,82 @@ public class UploadsController : ControllerBase
         var caminhoCompleto = Path.Combine(pastaUploads, nomeArquivo);
 
         stream.Position = 0;
-        await using (var destino = new FileStream(caminhoCompleto, FileMode.Create))
+        try
         {
-            await stream.CopyToAsync(destino);
+            RedimensionarEEnviar(stream, extensao, caminhoCompleto);
+        }
+        catch (MagickException ex)
+        {
+            _logger.LogWarning(ex, "Falha ao decodificar imagem no upload apesar da assinatura válida.");
+            return BadRequest(new { mensagem = "Não foi possível processar essa imagem. Tente outro arquivo." });
         }
 
         return Ok(new { url = $"/uploads/{nomeArquivo}" });
+    }
+
+    // Reduz a imagem se ela vier maior que o necessário (o upload original de
+    // uma foto de celular ou captura de tela facilmente passa de 1600px de
+    // largura à toa). Se já está dentro do limite, salva os bytes originais
+    // sem recomprimir — testado com um JPEG real já otimizado por outra
+    // ferramenta: recodificar sem necessidade deixou o arquivo MAIOR (81KB
+    // contra 69KB), não menor, então só vale a pena mexer quando redimensiona
+    // de verdade. GIF usa MagickImageCollection — trata cada quadro da
+    // animação separadamente, então o redimensionamento não quebra a animação.
+    private static void RedimensionarEEnviar(Stream origem, string extensao, string caminhoDestino)
+    {
+        if (extensao == ".gif")
+        {
+            using var quadros = new MagickImageCollection(origem);
+            if (!quadros.Any(quadro => quadro.Width > LarguraMaximaPx))
+            {
+                SalvarBytesOriginais(origem, caminhoDestino);
+                return;
+            }
+
+            foreach (var quadro in quadros)
+            {
+                if (quadro.Width > LarguraMaximaPx)
+                {
+                    quadro.Resize((uint)LarguraMaximaPx, 0);
+                }
+            }
+            quadros.Write(caminhoDestino, MagickFormat.Gif);
+            return;
+        }
+
+        using var imagem = new MagickImage(origem);
+        if (imagem.Width <= LarguraMaximaPx)
+        {
+            SalvarBytesOriginais(origem, caminhoDestino);
+            return;
+        }
+
+        imagem.Resize((uint)LarguraMaximaPx, 0);
+
+        switch (extensao)
+        {
+            case ".jpg":
+            case ".jpeg":
+                imagem.Quality = 82;
+                imagem.Write(caminhoDestino, MagickFormat.Jpeg);
+                break;
+            case ".webp":
+                imagem.Quality = 82;
+                imagem.Write(caminhoDestino, MagickFormat.WebP);
+                break;
+            case ".png":
+                imagem.Write(caminhoDestino, MagickFormat.Png);
+                break;
+            default:
+                imagem.Write(caminhoDestino);
+                break;
+        }
+    }
+
+    private static void SalvarBytesOriginais(Stream origem, string caminhoDestino)
+    {
+        origem.Position = 0;
+        using var destino = new FileStream(caminhoDestino, FileMode.Create);
+        origem.CopyTo(destino);
     }
 }

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.2.995" />
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.16.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
