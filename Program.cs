@@ -1,8 +1,10 @@
+using System.IO.Compression;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NewsPortal.Api.Data;
@@ -10,6 +12,17 @@ using NewsPortal.Api.Models;
 using NewsPortal.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// application/json já está nos MIME types padrão do meio-de-campo, então isso
+// cobre a API inteira sem configuração extra por rota.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
 
 // Banco SQLite: um único arquivo .db dentro da pasta App_Data do projeto.
 var sqliteConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -171,6 +184,10 @@ else
 }
 
 app.UseHttpsRedirection();
+
+// Precisa vir antes de qualquer middleware que escreve o corpo da resposta
+// (arquivos estáticos, os endpoints da API) pra conseguir comprimir tudo.
+app.UseResponseCompression();
 
 // Cabeçalhos de segurança padrão para API.
 app.Use(async (context, next) =>
