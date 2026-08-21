@@ -67,8 +67,10 @@ App_Data/*.db-wal
 !App_Data/.gitkeep
 
 # Imagens enviadas pelo painel admin — conteúdo de runtime, não de código.
-wwwroot/uploads/*
-!wwwroot/uploads/.gitkeep
+# Movido de wwwroot pra App_Data: é o diretório com volume persistente no
+# Railway, então os uploads sobrevivem a redeploys (ver UploadsController).
+App_Data/uploads/*
+!App_Data/uploads/.gitkeep
 
 # Segredos nunca vão para o repositório (chave JWT, credenciais do Admin).
 # Em dev use `dotnet user-secrets`; em produção, variáveis de ambiente.

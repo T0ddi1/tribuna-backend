@@ -73,13 +73,20 @@ public class UploadsController : ControllerBase
             return BadRequest(new { mensagem = "O conteúdo do arquivo não corresponde a uma imagem válida." });
         }
 
-        // Nome sempre gerado pelo servidor — nunca usar o nome original do
-        // cliente (evita path traversal e colisão/sobrescrita de arquivos).
-        var nomeArquivo = $"{Guid.NewGuid():N}{extensao}";
         // Dentro de App_Data (não wwwroot) — é o diretório com volume persistente
         // no Railway, então os uploads sobrevivem a redeploys do backend.
         var pastaUploads = Path.Combine(_environment.ContentRootPath, "App_Data", "uploads");
         Directory.CreateDirectory(pastaUploads);
+
+        // JPG/PNG viram WebP (bem menor no mesmo nível de qualidade visual) —
+        // GIF fica GIF (preserva a animação) e um WebP enviado continua WebP.
+        // A extensão final só é conhecida depois dessa decisão, por isso o
+        // nome do arquivo é montado com base no retorno do processamento.
+        var extensaoFinal = extensao is ".jpg" or ".jpeg" or ".png" ? ".webp" : extensao;
+
+        // Nome sempre gerado pelo servidor — nunca usar o nome original do
+        // cliente (evita path traversal e colisão/sobrescrita de arquivos).
+        var nomeArquivo = $"{Guid.NewGuid():N}{extensaoFinal}";
         var caminhoCompleto = Path.Combine(pastaUploads, nomeArquivo);
 
         stream.Position = 0;
@@ -98,15 +105,21 @@ public class UploadsController : ControllerBase
 
     // Reduz a imagem se ela vier maior que o necessário (o upload original de
     // uma foto de celular ou captura de tela facilmente passa de 1600px de
-    // largura à toa). Se já está dentro do limite, salva os bytes originais
-    // sem recomprimir — testado com um JPEG real já otimizado por outra
-    // ferramenta: recodificar sem necessidade deixou o arquivo MAIOR (81KB
-    // contra 69KB), não menor, então só vale a pena mexer quando redimensiona
-    // de verdade. GIF usa MagickImageCollection — trata cada quadro da
-    // animação separadamente, então o redimensionamento não quebra a animação.
-    private static void RedimensionarEEnviar(Stream origem, string extensao, string caminhoDestino)
+    // largura à toa). GIF usa MagickImageCollection — trata cada quadro da
+    // animação separadamente, então o redimensionamento não quebra a animação
+    // — e nunca converte de formato, só reduz se precisar.
+    // JPG/PNG sempre viram WebP, redimensionados ou não: mesmo sem precisar
+    // encolher, testei com um JPEG real de 69KB e o mesmo arquivo saiu com
+    // 59KB em WebP na mesma qualidade visual — vale a pena mesmo sem resize
+    // (a economia real varia bastante por imagem; fotos com mais textura
+    // costumam ganhar mais do que uma foto de capa já bem comprimida).
+    // WebP enviado como WebP segue a mesma regra de antes: só recomprime se
+    // for realmente redimensionar, pra não arriscar deixar o arquivo maior
+    // à toa (foi o que aconteceu recomprimindo sem necessidade, ver commit
+    // anterior).
+    private static void RedimensionarEEnviar(Stream origem, string extensaoOriginal, string caminhoDestino)
     {
-        if (extensao == ".gif")
+        if (extensaoOriginal == ".gif")
         {
             using var quadros = new MagickImageCollection(origem);
             if (!quadros.Any(quadro => quadro.Width > LarguraMaximaPx))
@@ -126,33 +139,25 @@ public class UploadsController : ControllerBase
             return;
         }
 
+        var converterParaWebp = extensaoOriginal is ".jpg" or ".jpeg" or ".png";
+
         using var imagem = new MagickImage(origem);
-        if (imagem.Width <= LarguraMaximaPx)
+        if (!converterParaWebp && imagem.Width <= LarguraMaximaPx)
         {
             SalvarBytesOriginais(origem, caminhoDestino);
             return;
         }
 
-        imagem.Resize((uint)LarguraMaximaPx, 0);
-
-        switch (extensao)
+        if (imagem.Width > LarguraMaximaPx)
         {
-            case ".jpg":
-            case ".jpeg":
-                imagem.Quality = 82;
-                imagem.Write(caminhoDestino, MagickFormat.Jpeg);
-                break;
-            case ".webp":
-                imagem.Quality = 82;
-                imagem.Write(caminhoDestino, MagickFormat.WebP);
-                break;
-            case ".png":
-                imagem.Write(caminhoDestino, MagickFormat.Png);
-                break;
-            default:
-                imagem.Write(caminhoDestino);
-                break;
+            imagem.Resize((uint)LarguraMaximaPx, 0);
         }
+
+        // A essa altura só sobram dois casos, e os dois viram WebP: uma
+        // conversão de JPG/PNG (redimensionada ou não), ou um WebP que
+        // precisou redimensionar (o "sem mudança nenhuma" já retornou acima).
+        imagem.Quality = 82;
+        imagem.Write(caminhoDestino, MagickFormat.WebP);
     }
 
     private static void SalvarBytesOriginais(Stream origem, string caminhoDestino)

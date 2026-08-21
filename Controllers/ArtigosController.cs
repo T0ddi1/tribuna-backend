@@ -297,6 +297,66 @@ public class ArtigosController : ControllerBase
         return Ok(dto);
     }
 
+    // Mesmo formato de ObterPorSlug, mas por id (rascunho não tem URL pública
+    // ainda), sem o filtro de Publicada e sem contar visualização — é só o
+    // admin/editor conferindo como o artigo vai ficar antes de publicar.
+    // Editor só pode ver prévia dos próprios artigos, igual à regra de edição.
+    [HttpGet("preview/{id:int}")]
+    [Authorize(Roles = "Admin,Editor")]
+    public async Task<ActionResult<ArtigoDetailDto>> Preview(int id)
+    {
+        var artigo = await _context.Artigos
+            .Include(a => a.Vertical)
+            .Include(a => a.Categoria)
+            .Include(a => a.Autor)
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (artigo is null)
+        {
+            return NotFound();
+        }
+
+        var autorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var ehAdmin = User.IsInRole(Roles.Admin);
+        if (!ehAdmin && artigo.AutorId != autorId)
+        {
+            return Forbid();
+        }
+
+        var relacionados = await _context.Artigos
+            .AsNoTracking()
+            .Include(a => a.Vertical)
+            .Include(a => a.Categoria)
+            .Include(a => a.Autor)
+            .Where(a => a.Publicada && a.VerticalId == artigo.VerticalId && a.Id != artigo.Id)
+            .OrderByDescending(a => a.PublicadoEm)
+            .Take(4)
+            .ToListAsync();
+
+        var dto = new ArtigoDetailDto
+        {
+            Id = artigo.Id,
+            Slug = artigo.Slug,
+            Titulo = artigo.Titulo,
+            Subtitulo = artigo.Subtitulo,
+            Resumo = artigo.Resumo,
+            ConteudoHtml = artigo.ConteudoHtml,
+            ImagemCapaUrl = artigo.ImagemCapaUrl,
+            Patrocinado = artigo.Patrocinado,
+            Publicada = artigo.Publicada,
+            PublicadoEm = artigo.PublicadoEm,
+            Visualizacoes = artigo.Visualizacoes,
+            VerticalNome = artigo.Vertical?.Nome ?? string.Empty,
+            VerticalSlug = artigo.Vertical?.Slug ?? string.Empty,
+            CategoriaNome = artigo.Categoria?.Nome,
+            CategoriaSlug = artigo.Categoria?.Slug,
+            AutorNome = !string.IsNullOrWhiteSpace(artigo.AutorExibicao) ? artigo.AutorExibicao : artigo.Autor?.NomeCompleto ?? string.Empty,
+            RelacionadosMesmaVertical = relacionados.Select(ParaListItemDto),
+        };
+
+        return Ok(dto);
+    }
+
     private static string GerarSlug(string titulo)
     {
         var normalizado = titulo.Trim().ToLowerInvariant();
