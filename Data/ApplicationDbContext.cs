@@ -17,6 +17,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ComentarioLike> ComentarioLikes => Set<ComentarioLike>();
     public DbSet<Favorito> Favoritos => Set<Favorito>();
     public DbSet<NewsletterAssinante> NewsletterAssinantes => Set<NewsletterAssinante>();
+    public DbSet<Publicidade> Publicidades => Set<Publicidade>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder builder)

@@ -429,6 +429,70 @@ namespace NewsPortal.Api.Migrations
                     b.ToTable("NewsletterAssinantes");
                 });
 
+            modelBuilder.Entity("NewsPortal.Api.Models.Publicidade", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CtaLabel")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Descricao")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ExibirEmTodasAsPaginas")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Externo")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Eyebrow")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Href")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImagemUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LogoUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SiteLabel")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tamanho")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tema")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("VerticalId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VerticalId");
+
+                    b.ToTable("Publicidades");
+                });
+
             modelBuilder.Entity("NewsPortal.Api.Models.RefreshToken", b =>
                 {
                     b.Property<int>("Id")
@@ -648,6 +712,15 @@ namespace NewsPortal.Api.Migrations
                     b.Navigation("Artigo");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("NewsPortal.Api.Models.Publicidade", b =>
+                {
+                    b.HasOne("NewsPortal.Api.Models.Vertical", "Vertical")
+                        .WithMany()
+                        .HasForeignKey("VerticalId");
+
+                    b.Navigation("Vertical");
                 });
 
             modelBuilder.Entity("NewsPortal.Api.Models.RefreshToken", b =>
