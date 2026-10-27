@@ -19,6 +19,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<NewsletterAssinante> NewsletterAssinantes => Set<NewsletterAssinante>();
     public DbSet<Publicidade> Publicidades => Set<Publicidade>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ConfiguracaoSite> ConfiguracoesSite => Set<ConfiguracaoSite>();
+    public DbSet<ConfiguracaoRodape> ConfiguracoesRodape => Set<ConfiguracaoRodape>();
+    public DbSet<MenuItem> MenuItens => Set<MenuItem>();
+    public DbSet<MenuLink> MenuLinks => Set<MenuLink>();
+    public DbSet<FooterLink> FooterLinks => Set<FooterLink>();
+    public DbSet<FooterRedeSocial> FooterRedesSociais => Set<FooterRedeSocial>();
+    public DbSet<FooterProjetoEspecial> FooterProjetosEspeciais => Set<FooterProjetoEspecial>();
+    public DbSet<PaginaInstitucional> PaginasInstitucionais => Set<PaginaInstitucional>();
+    public DbSet<AvisoSite> AvisosSite => Set<AvisoSite>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -101,6 +110,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<NewsletterAssinante>()
             .HasIndex(n => n.Email)
             .IsUnique();
+
+        builder.Entity<PaginaInstitucional>()
+            .HasIndex(p => p.Slug)
+            .IsUnique();
+
+        builder.Entity<MenuLink>()
+            .HasOne(l => l.MenuItem)
+            .WithMany(i => i.Links)
+            .HasForeignKey(l => l.MenuItemId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<RefreshToken>()
             .HasIndex(r => r.TokenHash)

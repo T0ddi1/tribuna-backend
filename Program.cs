@@ -162,6 +162,7 @@ using (var scope = app.Services.CreateScope())
 
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     await SeedService.ExecutarAsync(scope.ServiceProvider, app.Configuration, logger);
+    await SeedConteudoSite.ExecutarAsync(db, logger);
 }
 
 if (app.Environment.IsDevelopment())
