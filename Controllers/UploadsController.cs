@@ -103,6 +103,52 @@ public class UploadsController : ControllerBase
         return Ok(new { url = $"/uploads/{nomeArquivo}" });
     }
 
+    // Anexo para download (ex.: PDF de um regulamento numa página institucional).
+    // Só PDF, conferido pela assinatura "%PDF-" e nunca pelo nome/Content-Type.
+    // Servido como arquivo estático de /uploads, então um PDF não executa nada no servidor.
+    [HttpPost("documento")]
+    [EnableRateLimiting("uploads")]
+    [RequestSizeLimit(TamanhoMaximoBytes)]
+    public async Task<IActionResult> EnviarDocumento(IFormFile? arquivo)
+    {
+        if (arquivo is null || arquivo.Length == 0)
+        {
+            return BadRequest(new { mensagem = "Nenhum arquivo enviado." });
+        }
+
+        if (arquivo.Length > TamanhoMaximoBytes)
+        {
+            return BadRequest(new { mensagem = "Arquivo excede o tamanho máximo de 10 MB." });
+        }
+
+        if (!string.Equals(Path.GetExtension(arquivo.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { mensagem = "Formato não suportado. Envie um arquivo PDF." });
+        }
+
+        await using var stream = arquivo.OpenReadStream();
+        var cabecalho = new byte[5];
+        var lidos = await stream.ReadAsync(cabecalho.AsMemory(0, (int)Math.Min(5, arquivo.Length)));
+
+        if (lidos < 5 || !cabecalho.SequenceEqual("%PDF-"u8.ToArray()))
+        {
+            _logger.LogWarning("Upload de documento rejeitado: assinatura não é de um PDF.");
+            return BadRequest(new { mensagem = "O conteúdo do arquivo não corresponde a um PDF válido." });
+        }
+
+        var pastaUploads = Path.Combine(_environment.ContentRootPath, "App_Data", "uploads");
+        Directory.CreateDirectory(pastaUploads);
+
+        var nomeArquivo = $"{Guid.NewGuid():N}.pdf";
+        stream.Position = 0;
+        await using (var destino = System.IO.File.Create(Path.Combine(pastaUploads, nomeArquivo)))
+        {
+            await stream.CopyToAsync(destino);
+        }
+
+        return Ok(new { url = $"/uploads/{nomeArquivo}" });
+    }
+
     // Reduz a imagem se ela vier maior que o necessário (o upload original de
     // uma foto de celular ou captura de tela facilmente passa de 1600px de
     // largura à toa). GIF usa MagickImageCollection — trata cada quadro da
